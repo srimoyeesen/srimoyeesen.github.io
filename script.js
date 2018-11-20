@@ -1,39 +1,51 @@
-window.onVideoButtonClick = function() {
-  // Normalize the various vendor prefixed versions of getUserMedia.
-  navigator.getUserMedia =
-    navigator.getUserMedia ||
-    navigator.webkitGetUserMedia ||
-    navigator.mozGetUserMedia ||
-    navigator.msGetUserMedia;
-  // Check that the browser supports getUserMedia.
-  // If it doesn't show an alert, otherwise continue.
-  if (navigator.getUserMedia) {
-    // Request the camera.
-    navigator.getUserMedia(
-      // Constraints
-      {
-        video: true
-      },
+'use strict';
 
-      // Success Callback
-      function(localMediaStream) {
-        var vid = document.getElementById("camera-stream");
+var videoElement = document.querySelector('video');
+var videoSelect = document.querySelector('select#videoSource');
 
-        // Create an object URL for the video stream and use this
-        // to set the video source.
-        vid.src = window.URL.createObjectURL(localMediaStream);
-      },
+navigator.mediaDevices.enumerateDevices()
+  .then(gotDevices).then(getStream).catch(handleError);
 
-      // Error Callback
-      function(err) {
-        // Log the error to the console.
-        console.log(
-          "The following error occurred when trying to use getUserMedia: " + err
-        );
-      }
-    );
-  } else {
-    alert("Sorry, your browser does not support getUserMedia");
+videoSelect.onchange = getStream;
+
+function gotDevices(deviceInfos) {
+  for (var i = 0; i !== deviceInfos.length; ++i) {
+    var deviceInfo = deviceInfos[i];
+    var option = document.createElement('option');
+    option.value = deviceInfo.deviceId;
+    if (deviceInfo.kind === 'videoinput') {
+      option.text = deviceInfo.label || 'camera ' +
+        (videoSelect.length + 1);
+      videoSelect.appendChild(option);
+    } else {
+      console.log('Found one other kind of source/device: ', deviceInfo);
+    }
   }
-  // Get a reference to the video element on the page.
-};
+}
+
+function getStream() {
+  if (window.stream) {
+    window.stream.getTracks().forEach(function(track) {
+      track.stop();
+    });
+  }
+
+  var constraints = {
+    video: {
+      deviceId: {exact: videoSelect.value}
+    }
+  };
+
+  navigator.mediaDevices.getUserMedia(constraints).
+    then(gotStream).catch(handleError);
+}
+
+function gotStream(stream) {
+  window.stream = stream; // make stream available to console
+  videoElement.srcObject = stream;
+}
+
+function handleError(error) {
+  console.log('Error: ', error);
+}
+
